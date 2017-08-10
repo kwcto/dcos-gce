@@ -1,0 +1,83 @@
+{
+  "name": "kwcto/dcos-gce",
+  "version": "0.1.4",
+  "libraries": {
+    "xv": "^1.1.25"
+  },
+  "title": "",
+  "branch": "master",
+  "style": {
+    "name": "Swiss",
+    "componentSet": {
+      "nav": "nav/BasicNav",
+      "header": "header/SwissHeader",
+      "article": "article/SwissArticle",
+      "footer": "footer/BasicFooter"
+    },
+    "fontFamily": "\"Helvetica Neue\", Helvetica, Arial, sans-serif",
+    "heading": {
+      "fontWeight": 700,
+      "letterSpacing": "-0.01em"
+    },
+    "layout": {
+      "fluid": true
+    },
+    "colors": {
+      "text": "#000",
+      "background": "#fff",
+      "primary": "#05a",
+      "secondary": "#444",
+      "highlight": "#f30",
+      "border": "#ccc",
+      "muted": "#eee"
+    }
+  },
+  "content": [
+    {
+      "component": "nav",
+      "links": [
+        {
+          "href": "https://github.com/kwcto/dcos-gce",
+          "text": "GitHub"
+        }
+      ]
+    },
+    {
+      "component": "header",
+      "heading": "dcos-gce",
+      "subhead": "Ansible script to install DC/OS on Google Compute Engine",
+      "children": [
+        {
+          "component": "ui/TweetButton",
+          "text": "dcos-gce: Ansible script to install DC/OS on Google Compute Engine",
+          "url": null
+        },
+        {
+          "component": "ui/GithubButton",
+          "user": "kwcto",
+          "repo": "dcos-gce"
+        }
+      ]
+    },
+    {
+      "component": "article",
+      "metadata": {
+        "source": "github.readme"
+      },
+      "html": "<p>#DCOS on Google Compute Engine</p>\n<p>This repository contains scripts to configure a DC/OS cluster on Google Compute Engine.</p>\n<p>A bootstrap node is required to run the scripts and to bootstrap the DC/OS cluster.</p>\n<p><strong>PLEASE READ THE ENTIRE DOCUMENT. YOU MUST MAKE CHANGES FOR THE SCRIPTS TO WORK IN YOUR GCE ENVIRONMENT.</strong></p>\n<p>##Bootstrap node configuration</p>\n<p><strong>YOU MUST CREATE A PROJECT</strong> using the google cloud console. The author created a project called trek-treckr</p>\n<p>You can create the bootstrap node using the google cloud console. The author used a n1-standard-1 instance running centos 7 with a 10 GB persistent disk in \nzone europe-west1-c. The bootstrap node must have &quot;Allow full access to all Cloud APIs&quot; in the Identity and API access section. Also enable Block project-wide SSH keys in the SSH Keys section. Create the instance.</p>\n<p>After creating the boot instance run the following from the shell</p>\n<pre>sudo yum update google-cloud-sdk\nsudo yum update\nsudo yum install epel-release\nsudo yum install python-pip\nsudo pip install -U pip\nsudo pip install <span class=\"hljs-string\">&apos;apache-libcloud==1.2.1&apos;</span>\nsudo pip install <span class=\"hljs-string\">&apos;docker-py==1.9.0&apos;</span>\nsudo yum install git-1.8.3.1 ansible-2.1.1.0</pre><p>You need to create the rsa public/private keypairs to allow passwordless logins via SSH to the nodes of the DC/OS cluster. This is required by ansible to create the cluster nodes and install DC/OS on the nodes.</p>\n<p>Run the following to generate the keys</p>\n<pre>ssh-keygen -t rsa <span class=\"hljs-_\">-f</span> ~/.ssh/id_rsa -C ajazam</pre><p><strong>PLEASE REPLACE ajazam</strong> with your username. Do not eneter a password when prompted</p>\n<p>Make a backup copy of id_rsa.pub.</p>\n<p>Open rsa pub key</p>\n<pre>sudo vi ~/.ssh/id_rsa.pub</pre><p>shows</p>\n<pre>ssh-rsa abcdefghijklmaasnsknsdjfsdfjs;dfj;sdflkjsd ajazam</pre><p>Prefix your username, followed by a colon, to the above line. Also replace ajazam at the end with your username.</p>\n<pre>ajazam:ssh-rsa abcdefghijklmaasnsknsdjfsdfjs;dfj;sdflkjsd ajazam</pre><p>save contents of id_rsa.pub. <strong>Please replace the ajazam with your username</strong>. </p>\n<p>Add the rsa public key to your project</p>\n<pre>chmod 400 ~/.ssh/id_rsa\ngcloud compute project-info add-metadata --metadata-from-file sshKeys=~/.ssh/id_rsa.pub</pre><p>Disable selinux for docker to work</p>\n<p>make the following change to /etc/selinux/config</p>\n<pre>SELINUX=disabled</pre><p>reboot host</p>\n<p>To install docker add the yum repo</p>\n<pre>sudo tee /etc/yum.repos.d/docker.repo &lt;&lt;-<span class=\"hljs-string\">&apos;EOF&apos;</span>\n[dockerrepo]\nname=Docker Repository\nbaseurl=https://yum.dockerproject.org/repo/main/centos/7/\nenabled=1\ngpgcheck=1\ngpgkey=https://yum.dockerproject.org/gpg\nEOF</pre><p>install the docker package</p>\n<pre>sudo yum install docker-engine-1.11.2</pre><p>Add following changes to /usr/lib/systemd/system/docker.service</p>\n<pre>ExecStart=/usr/bin/docker daemon --storage-driver=overlay</pre><p>reload systemd</p>\n<pre>sudo systemctl daemon-reload</pre><p>Start docker</p>\n<pre>sudo systemctl start docker.service</pre><p>Verify if docker works</p>\n<pre>sudo docker run hello-world</pre><p>download the dcos-gce scripts</p>\n<pre>git <span class=\"hljs-built_in\">clone</span> https://github.com/ajazam/dcos-gce</pre><p>change directory</p>\n<pre><span class=\"hljs-built_in\">cd</span> dcos-gce</pre><p>Please make appropriate changes to dcos_gce/group_vars/all. You need to review project, subnet, login_name, bootstrap_public_ip &amp; zone</p>\n<p>insert following into ~/.ansible.cfg to stop host key checking</p>\n<pre>[defaults]\nhost_key_checking = False\n\n[paramiko_connection]\nrecord_host_keys = False\n\n[ssh_connection]\nssh_args = -o ControlMaster=auto -o ControlPersist=60s -o UserKnownHostsFile=/dev/null</pre><p>Ensure the IP address for master0 in ./hosts is the next consecutive IP from bootstrap_public_ip.</p>\n<p>To create and configure the master nodes run</p>\n<pre>ansible-playbook -i hosts install.yml</pre><p>To create and configure the private nodes run</p>\n<pre>ansible-playbook -i hosts add_agents.yml --extra-vars <span class=\"hljs-string\">&quot;start_id=0001 end_id=0002 agent_type=private&quot;</span></pre><p>start_id=0001 and end_id=0002 specify the range of id&apos;s that are appended to the hostname &quot;agent&quot; to create unique agent names. If start_id is not specified then a default of 0001 is used. \nIf the end_id is not specified then a default of 0001 is used.</p>\n<p><em>When specifying start_id or end_id via CLI, the leading zeroes must be dropped for any agent id higher than 7</em> or ansible will throw a format error.</p>\n<pre>ansible-playbook -i hosts add_agents.yml --extra-vars <span class=\"hljs-string\">&quot;start_id=0006 end_id=10 agent_type=private&quot;</span></pre><p>The values for agent_type are either private or public. If an agent_type is not specified then it is assumed agent_type is private.</p>\n<p>To create public nodes type</p>\n<pre>ansible-playbook -i hosts add_agents.yml --extra-vars <span class=\"hljs-string\">&quot;start_id=0003 end_id=0004 agent_type=public&quot;</span></pre><p>##Configurable parameters</p>\n<p>File &apos;./hosts&apos; is an ansible inventory file. Text wrapped by [] represents a group name and individual entries after the group name represent hosts in that group.\nThe [masters] group contains node names and IP addresses for the master nodes. In the supplied file the host name is master0 and the ip address 10.132.0.3 is assigned to \nmaster0. <strong>YOU MUST CHANGE</strong> the IP address for master0 for your network. You can create multiple entries e.g. master1, master2 etc. Each node must have a unique IP address.</p>\n<p>The [agents] group has one entry. It specifies the names of all the agents one can have in the DC/OS cluster. The value specifies that agent0000 to agent9999, a \ntotal of 10,000 agents are allowed. This really is an artificial limit because it can easily be changed.</p>\n<p>The [bootstrap] group has the name of the bootstrap node.</p>\n<p>File &apos;./group_vars/all&apos; contains miscellaneous parameters that will change the behaviour of the installation scripts. The parameters are split into two groups. Group 1 parameters must be changed to reflect your environment. Group 2 parameters can optionally be changed to change the behaviour of the scripts.</p>\n<p>###Group 1 parameters YOU MUST CHANGE for your environment</p>\n<pre>project</pre><p>Your project id. Default: trek-trackr</p>\n<pre>subnet</pre><p>Your network. Default: default</p>\n<pre>login_name</pre><p>The login name used for accessing each GCE instance. Default: ajazam</p>\n<pre>bootstrap_public_ip</pre><p>The bootstrap nodes public IP. Default: 10.132.0.2</p>\n<pre>zone</pre><p>You may change this to your preferred zone. Default: europe-west1-d</p>\n<p>###Group 2 parameters which optionally change the behaviour of the installation scripts</p>\n<pre>master_boot_disk_size:</pre><p>The size of the master node boot disk. Default 10 GB</p>\n<pre>master_machine_type</pre><p>The GCE instance type used for the master nodes. Default: n1-standard-2</p>\n<pre>master_boot_disk_type</pre><p>The master boot disk type. Default: pd-standard</p>\n<pre>agent_boot_disk_size</pre><p>The size of the agent boot disk. Default 10 GB</p>\n<pre>agent_machine_type</pre><p>The GCE instance type used for the agent nodes. Default: n1-standard-2</p>\n<pre>agent_boot_disk_type</pre><p>The agent boot disk type. Default: pd-standard</p>\n<pre>agent_instance_type</pre><p>Allows agents to be preemptible. If the value is &quot;MIGRATE&quot; then they are not preemptible. If the value is &apos;&quot;TERMINATE&quot; --preemptible&apos; then the instance is preemptible. Default: &quot;MIGRATE&quot;</p>\n<pre>agent_type</pre><p>Can specify whether an agent is &quot;public&quot; or &quot;private&quot;. Default: &quot;private&quot;</p>\n<pre>start_id</pre><p>The number appended to the text <em>agent</em> is used to define the hostname of the first agent. e.g. agent0001. Intermediate agents between start_id and end_id will be created if required. Default: 0001</p>\n<pre>end_id</pre><p>The number appended to the text <em>agent</em> is used to define the hostname of the last agent. e.g. agent0001. Intermediate agents between start_id and end_id will be created if required. Default: 0001</p>\n<pre>gcloudbin</pre><p>The location of the gcloudbin binary. Default: /usr/local/bin/gcloud</p>\n<pre>image</pre><p>The disk image used on the master and agent. Default: /centos-cloud/centos-7-v20160921</p>\n<pre>bootstrap_public_port</pre><p>The port on the bootstrap node which is used to fetch the dcos installer from each of the master and agent nodes. Default: 8080</p>\n<pre>cluster_name</pre><p>The name of the DC/OS cluster. Default: cluster_name</p>\n<pre>scopes</pre><p>Don&apos;t change this. Required by the google cloud SDK</p>\n<pre>dcos_installer_filename</pre><p>The filename for the DC/OS installer. Default dcos_generate_config.sh</p>\n<pre>dcos_installer_download_path</pre><p>The location of where the dcos installer is available from dcos.io. Default: <a href=\"https://downloads.dcos.io/dcos/stable/{{\">https://downloads.dcos.io/dcos/stable/{{</a> dcos_installer_filename }} The value of {{ dcos_installer_file }} is described above.</p>\n<pre>home_directory</pre><p>The home directory for your logins. Default: /home/{{ login_name }} The value of {{ login_name }} is described above.</p>\n<pre>downloads_from_bootstrap</pre><p>The concurrent downloads of the dcos installer to the cluster of master and agent nodes. You may need to experiment with this to get the best performance. The performance will be a function of the machine type used for the bootstrap node. Default: 2</p>\n<pre>dcos_bootstrap_container</pre><p>Holds the name of the dcos bootstrap container running on the bootstrap node. Default: dcosinstaller</p>\n"
+    },
+    {
+      "component": "footer",
+      "links": [
+        {
+          "href": "https://github.com/kwcto/dcos-gce",
+          "text": "GitHub"
+        },
+        {
+          "href": "https://github.com/kwcto",
+          "text": "kwcto"
+        }
+      ]
+    }
+  ]
+}
